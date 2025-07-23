@@ -9,8 +9,14 @@ pub struct User {
     pub password: Option<String>,
 }
 
-pub async fn get_users(State(db): State<Db>) -> Json<Vec<User>> {
-    let users = sqlx::query_as::<_, User>("SELECT id, username FROM users")
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct UserForList {
+    id: i64,
+    username: String,
+}
+
+pub async fn get_users(State(db): State<Db>) -> Json<Vec<UserForList>> {
+    let users = sqlx::query_as("SELECT id, username FROM users")
         .fetch_all(&db)
         .await
         .unwrap();
