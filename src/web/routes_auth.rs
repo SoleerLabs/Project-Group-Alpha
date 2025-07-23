@@ -5,39 +5,50 @@ use axum::extract::State;
 use axum::{Json, Router};
 use axum::routing::post;
 use serde_json::{json, Value};
-use argon2::{Argon2, PasswordHasher};
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use argon2::password_hash::SaltString;
 use rand::rngs::OsRng;
 
 //Region -----Router-------
 pub fn routes(db: Db) -> Router {
     Router::new()
-        .route("/login", post(api_login))
-        .route("/register", post(api_register))
+        .route("/login", post(login))
+        .route("/register", post(register))
         .with_state(db)
 }
 
-async fn api_login(payload: Json<LoginPayload>) -> Result<Json<Value>> {
-    println!("->> {:<12} - api_login {payload:?}", "HANDLER");
-    // Simulate a login check
-    if payload.username == "admin" && payload.password == "password" {
-        Ok(Json(json!({"status": "success", "message": "Login successful"})))
-    } else {
-        Err(Error::LoginFail)
+//Region --- Login
+async fn login(
+    State(db): State<Db>,
+    Json(payload): Json<AuthPayload>,
+) -> Result<Json<Value>> {
+    // --- Find user
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = $1")
+        .bind(payload.username)
+        .fetch_optional(&db)
+        .await?
+        .ok_or(Error::LoginFail)?;
+
+    // --- Verify password
+    let password_verified = verify_password(&payload.password, &user.password.unwrap_or_default())?;
+    if !password_verified {
+        return Err(Error::LoginFail);
     }
 
-    //TODO: ------Create db auth/db-------
+    // --- Login success
+    Ok(Json(json!({"status": "success", "message": "Login successful"})))
 }
 
+//Region --- Register
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
 struct ReturnedUser {
     id: i64,
     username: String,
 }
 
-async fn api_register(
+async fn register(
     State(db): State<Db>,
-    Json(payload): Json<LoginPayload>,
+    Json(payload): Json<AuthPayload>,
 ) -> Result<Json<Value>> {
     let password_hash = hash_password(&payload.password)?;
 
@@ -60,6 +71,7 @@ async fn api_register(
     })))
 }
 
+//Region --- Password Hashing/Verification
 fn hash_password(password: &str) -> Result<String> {
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
@@ -69,9 +81,17 @@ fn hash_password(password: &str) -> Result<String> {
     Ok(hash)
 }
 
+fn verify_password(password: &str, hash: &str) -> Result<bool> {
+    let parsed_hash = PasswordHash::new(hash).map_err(|_| Error::AuthFail)?;
+    Ok(Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .is_ok())
+}
+
+
 //Region ----Define Payload-----
 #[derive(Debug, serde::Deserialize)]
-struct LoginPayload {
+struct AuthPayload {
     pub username: String,
     pub password: String,
 }
