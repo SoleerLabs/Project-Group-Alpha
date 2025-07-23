@@ -5,7 +5,8 @@ use axum::extract::State;
 use axum::{Json, Router};
 use axum::routing::post;
 use serde_json::{json, Value};
-use argon2::{Argon2, PasswordHasher, SaltString};
+use argon2::{Argon2, PasswordHasher};
+use argon2::password_hash::SaltString;
 use rand::rngs::OsRng;
 
 //Region -----Router-------
@@ -28,13 +29,19 @@ async fn api_login(payload: Json<LoginPayload>) -> Result<Json<Value>> {
     //TODO: ------Create db auth/db-------
 }
 
+#[derive(Debug, serde::Serialize, sqlx::FromRow)]
+struct ReturnedUser {
+    id: i64,
+    username: String,
+}
+
 async fn api_register(
     State(db): State<Db>,
     Json(payload): Json<LoginPayload>,
 ) -> Result<Json<Value>> {
     let password_hash = hash_password(&payload.password)?;
 
-    let user = sqlx::query_as::<_, User>(
+    let user = sqlx::query_as::<_, ReturnedUser>(
         "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username",
     )
     .bind(payload.username)
