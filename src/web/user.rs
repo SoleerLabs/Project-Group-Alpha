@@ -1,17 +1,17 @@
-
+use crate::web::db::Db;
+use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};
-use axum::response::Json;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, sqlx::FromRow)]
 pub struct User {
     pub id: i64,
     pub username: String,
 }
 
-pub async fn get_users() -> Json<Vec<User>> {
-    let users = vec![
-        User { id: 1, username: "Alice".to_string() },
-        User { id: 2, username: "Bob".to_string() },
-    ];
+pub async fn get_users(State(db): State<Db>) -> Json<Vec<User>> {
+    let users = sqlx::query_as::<_, User>("SELECT id, username FROM users")
+        .fetch_all(&db)
+        .await
+        .unwrap();
     Json(users)
 }
