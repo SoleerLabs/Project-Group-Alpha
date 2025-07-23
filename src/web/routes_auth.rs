@@ -1,15 +1,17 @@
 use crate::web::db::Db;
 use crate::web::user::User;
 use crate::{Error, Result};
-use axum::extract::State;
-use axum::{Json, Router};
-use axum::routing::post;
-use serde_json::{json, Value};
-use argon2::{Argon2, PasswordHasher, PasswordHash, PasswordVerifier};
 use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use axum::extract::State;
+use axum::routing::post;
+use axum::{Json, Router};
+use chrono::{Duration, Utc};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use rand::rngs::OsRng;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
-//Region -----Router-------
 pub fn routes(db: Db) -> Router {
     Router::new()
         .route("/login", post(login))
@@ -17,39 +19,35 @@ pub fn routes(db: Db) -> Router {
         .with_state(db)
 }
 
-//Region --- Login
-async fn login(
-    State(db): State<Db>,
-    Json(payload): Json<AuthPayload>,
-) -> Result<Json<Value>> {
-    // --- Find user
+async fn login(State(db): State<Db>, Json(payload): Json<AuthPayload>) -> Result<Json<Value>> {
     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = $1")
         .bind(payload.username)
         .fetch_optional(&db)
         .await?
         .ok_or(Error::LoginFail)?;
 
-    // --- Verify password
     let password_verified = verify_password(&payload.password, &user.password.unwrap_or_default())?;
     if !password_verified {
         return Err(Error::LoginFail);
     }
 
-    // --- Login success
-    Ok(Json(json!({"status": "success", "message": "Login successful"})))
+    let token = create_token(user.id)?;
+
+    Ok(Json(json!({
+        "status": "success",
+        "data": {
+            "token": token
+        }
+    })))
 }
 
-//Region --- Register
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
 struct ReturnedUser {
     id: i64,
     username: String,
 }
 
-async fn register(
-    State(db): State<Db>,
-    Json(payload): Json<AuthPayload>,
-) -> Result<Json<Value>> {
+async fn register(State(db): State<Db>, Json(payload): Json<AuthPayload>) -> Result<Json<Value>> {
     let password_hash = hash_password(&payload.password)?;
 
     let user = sqlx::query_as::<_, ReturnedUser>(
@@ -71,7 +69,32 @@ async fn register(
     })))
 }
 
-//Region --- Password Hashing/Verification
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: i64,
+    exp: usize,
+}
+
+fn create_token(user_id: i64) -> Result<String> {
+    let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let expiration = Utc::now()
+        .checked_add_signed(Duration::hours(1))
+        .expect("valid timestamp")
+        .timestamp();
+
+    let claims = Claims {
+        sub: user_id,
+        exp: expiration as usize,
+    };
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_ref()),
+    )
+    .map_err(|_| Error::AuthFail)
+}
+
 fn hash_password(password: &str) -> Result<String> {
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
@@ -88,8 +111,6 @@ fn verify_password(password: &str, hash: &str) -> Result<bool> {
         .is_ok())
 }
 
-
-//Region ----Define Payload-----
 #[derive(Debug, serde::Deserialize)]
 struct AuthPayload {
     pub username: String,

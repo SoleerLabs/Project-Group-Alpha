@@ -17,6 +17,9 @@ dotenv = "0.15.0"
 sqlx = { version = "0.7", features = [ "runtime-tokio", "postgres", "macros", "chrono", "tls-rustls" ] }
 argon2 = { version = "0.5.3", features = ["rand"] }
 rand = "0.8.5"
+jsonwebtoken = "9.3.0"
+chrono = "0.4"
+
 
 
 [dev-dependencies]
