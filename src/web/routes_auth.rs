@@ -4,12 +4,9 @@ use crate::{Error, Result};
 use axum::extract::State;
 use axum::{Json, Router};
 use axum::routing::post;
-use rand::rngs::OsRng;
-use rand::RngCore;
 use serde_json::{json, Value};
-use argon2::{Argon2, PasswordHasher, PasswordHash, PasswordVerifier};
-use std::str::FromStr;
-
+use argon2::{Argon2, PasswordHasher, SaltString};
+use rand::rngs::OsRng;
 
 //Region -----Router-------
 pub fn routes(db: Db) -> Router {
@@ -38,7 +35,7 @@ async fn api_register(
     let password_hash = hash_password(&payload.password)?;
 
     let user = sqlx::query_as::<_, User>(
-        "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+        "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username",
     )
     .bind(payload.username)
     .bind(password_hash)
@@ -57,11 +54,12 @@ async fn api_register(
 }
 
 fn hash_password(password: &str) -> Result<String> {
-    let salt = rand::thread_rng().gen::<[u8; 16]>();
+    let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
         .hash_password(password.as_bytes(), &salt)
-        .map_err(|_| Error::AuthFail)?;
-    Ok(hash.to_string())
+        .map_err(|_| Error::AuthFail)?
+        .to_string();
+    Ok(hash)
 }
 
 //Region ----Define Payload-----
