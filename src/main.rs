@@ -1,6 +1,6 @@
 pub use self::errors::{Error, Result};
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     response::{Html, IntoResponse},
     routing::{get, get_service},
     Router,
@@ -18,7 +18,7 @@ async fn main() {
 
     let routes_all = Router::new().merge(
         routes_hello(db_pool.clone())
-            .merge(web::routes_login::route())
+            .nest("/api", web::routes_auth::routes(db_pool.clone()))
             .fallback_service(routes_static()),
     );
 
