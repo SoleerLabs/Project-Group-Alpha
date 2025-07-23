@@ -18,7 +18,10 @@ impl IntoResponse for Error {
         let (status, error_message) = match self {
             Error::LoginFail => (StatusCode::UNAUTHORIZED, "Login failed"),
             Error::AuthFail => (StatusCode::INTERNAL_SERVER_ERROR, "Authentication failed"),
-            Error::SqlxError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error"),
+            Error::SqlxError(err) => {
+                eprintln!("->> SQLX Error: {err:?}");
+                (StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+            }
         };
 
         let body = json!({

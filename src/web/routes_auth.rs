@@ -5,7 +5,7 @@ use axum::extract::State;
 use axum::{Json, Router};
 use axum::routing::post;
 use serde_json::{json, Value};
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::{Argon2, PasswordHasher, PasswordHash, PasswordVerifier};
 use argon2::password_hash::SaltString;
 use rand::rngs::OsRng;
 
