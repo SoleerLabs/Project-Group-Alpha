@@ -49,4 +49,4 @@ fn routes_static() -> Router {
 }
 
 //Region ----Routes Hello----
-fn routes_hello()-> Router { Router::new().route("/hello", get(handler_hello)).route("/hello2/{name}", get(handler_hello2))}
+fn routes_hello()-> Router { Router::new().route("/hello", get(handler_hello)).route("/hello2/{name}", get(handler_hello2)).route("/users", get(web::user::get_users)) }
