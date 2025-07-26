@@ -2,7 +2,7 @@ use crate::web::db::Db;
 use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, sqlx::FromRow, Default)]
+#[derive(Debug, Deserialize, Serialize, sqlx::FromRow, Default, Clone)]
 pub struct User {
     pub id: i64,
     pub username: String,
