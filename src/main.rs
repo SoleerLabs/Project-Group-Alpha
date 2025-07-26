@@ -1,12 +1,14 @@
 pub use self::errors::{Error, Result};
 use axum::{
     extract::{Path, Query},
+    middleware,
     response::{Html, IntoResponse},
     routing::{get, get_service},
     Router,
 };
 use std::net::SocketAddr;
 use tower_http::services::ServeDir;
+mod ctx;
 mod errors;
 mod web;
 use web::db::{new_db_pool, Db};
@@ -16,15 +18,17 @@ async fn main() {
     dotenv::dotenv().ok();
     let db_pool = new_db_pool().await.expect("Failed to create database pool");
 
-    let routes_all = Router::new().merge(
-        routes_hello(db_pool.clone())
-            .nest("/api", web::routes_auth::routes(db_pool.clone()))
-            .fallback_service(routes_static()),
-    );
+    let auth_routes = web::routes_auth::routes(db_pool.clone())
+        .route_layer(middleware::from_fn_with_state(db_pool.clone(), web::mw_auth::mw_auth));
+
+    let routes_all = Router::new()
+        .merge(routes_hello(db_pool.clone()))
+        .nest("/api", auth_routes)
+        .fallback_service(routes_static());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     println!("-->>> Listening on http://{}", addr);
-    //region ----start server----
+    //region ----start server-----
     axum::serve(
         tokio::net::TcpListener::bind(addr).await.unwrap(),
         routes_all,

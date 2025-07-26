@@ -1,10 +1,11 @@
+use crate::ctx::Ctx;
 use crate::web::db::Db;
 use crate::web::user::User;
 use crate::{Error, Result};
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use axum::extract::State;
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
@@ -16,7 +17,20 @@ pub fn routes(db: Db) -> Router {
     Router::new()
         .route("/login", post(login))
         .route("/register", post(register))
+        .route("/me", get(me))
         .with_state(db)
+}
+
+async fn me(ctx: Ctx) -> Result<Json<Value>> {
+    Ok(Json(json!({
+        "status": "success",
+        "data": {
+            "user": {
+                "id": ctx.user.id,
+                "username": ctx.user.username
+            }
+        }
+    })))
 }
 
 async fn login(State(db): State<Db>, Json(payload): Json<AuthPayload>) -> Result<Json<Value>> {
