@@ -3,8 +3,8 @@ use sqlx::{FromRow, Type};
 use chrono::{DateTime, Utc};
 use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, Type, Clone, Copy)]
-#[sqlx(type_name = "task_status", rename_all = "lowercase")]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Type, Clone, Copy, PartialEq, Eq)]
+#[sqlx(type_name = "task_status", rename_all = "snake_case")]
 pub enum TaskStatus {
     Pending,
     InProgress,
