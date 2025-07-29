@@ -11,24 +11,25 @@ use tower_http::services::ServeDir;
 mod ctx;
 mod errors;
 mod web;
-use web::db::{new_db_pool, Db};
+use web::db::{new_db_pool, Db}; // Import Db type alias
 
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
-    let db_pool = new_db_pool().await.expect("Failed to create database pool");
+    // Call new_db_pool, and assign its result directly to `db`
+    let db: Db = new_db_pool().await.expect("Failed to create database pool"); // FIX IS HERE!
 
-    let auth_routes = web::routes_auth::routes(db_pool.clone())
-        .route_layer(middleware::from_fn_with_state(db_pool.clone(), web::mw_auth::mw_auth));
+    let auth_routes = web::routes_auth::routes(db.clone())
+        .route_layer(middleware::from_fn_with_state(db.clone(), web::mw_auth::mw_auth));
 
     let routes_all = Router::new()
-        .merge(routes_hello(db_pool.clone()))
+        .merge(routes_hello(db.clone()))
+        .merge(web::routes_projects::routes(db.clone()))
         .nest("/api", auth_routes)
         .fallback_service(routes_static());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     println!("-->>> Listening on http://{}", addr);
-    //region ----start server-----
     axum::serve(
         tokio::net::TcpListener::bind(addr).await.unwrap(),
         routes_all,
@@ -62,7 +63,7 @@ fn routes_static() -> Router {
 }
 
 //Region ----Routes Hello----
-fn routes_hello(db: Db) -> Router {
+fn routes_hello(db: Db) -> Router { // This `db` is a `Db` type (i.e. `PgPool`)
     Router::new()
         .route("/hello", get(handler_hello))
         .route("/hello2/{name}", get(handler_hello2))
