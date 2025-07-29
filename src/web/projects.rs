@@ -1,7 +1,7 @@
 // src/web/project.rs
-use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool}; // PgPool is unused here, it's a warning, but you asked to ignore warnings
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 use utoipa::ToSchema;
 #[derive(Debug, Serialize, FromRow, Clone, ToSchema)]
 pub struct Project {
@@ -9,8 +9,8 @@ pub struct Project {
     pub user_id: i64,
     pub name: String,
     pub description: Option<String>,
-    pub created_at: Option<DateTime<Utc>>, // CHANGED TO OPTION
-    pub updated_at: Option<DateTime<Utc>>, // CHANGED TO OPTION
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

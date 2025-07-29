@@ -1,74 +1,46 @@
 use axum::{
     extract::{Path, Query, State},
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Json, Router,
 };
 use serde_json::{json, Value};
-use sqlx::PgPool;
 
-use crate::errors::{Error, Result}; // errors.rs is at crate root
-use utoipa::OpenApi;
-// All these are siblings within the 'web' module
-use crate::ctx::Ctx; // Correct path to Ctx
-use super::db::Db;   // Correct path to Db
-use super::projects::{ // Correct path to project models
+use crate::ctx::Ctx;
+use crate::errors::{Error, Result};
+use crate::web::db::Db;
+use crate::web::projects::{
     CreateProjectPayload, Project, ProjectListQueryParams, UpdateProjectPayload,
 };
+
 pub fn routes(db: Db) -> Router {
     Router::new()
         .route("/projects", post(create_project).get(list_projects))
         .route(
             "/projects/{id}",
-            get(get_project_by_id)
-                .put(update_project)
-                .delete(delete_project),
+            get(get_project_by_id).put(update_project).delete(delete_project),
         )
         .with_state(db)
 }
 
-// POST /projects
-// Body: { name, description }
-// Creates a project for the logged-in user.
-#[utoipa::path(
-    post,
-    path = "/projects",
-    request_body = CreateProjectPayload, // Refers to the struct defined with ToSchema
-    responses(
-        (status = 201, description = "Project created successfully", body = Project), // Assuming Project is returned
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("jwt_token" = [])) // Marks this as secured by JWT
-)]
 async fn create_project(
-    Ctx { user: ctx_user }: Ctx, // FIXED: Destructure Ctx using struct pattern
+    ctx: Ctx,
     State(db): State<Db>,
     Json(payload): Json<CreateProjectPayload>,
 ) -> Result<Json<Value>> {
-    let project = sqlx::query_as!(
-        Project,
-        "INSERT INTO projects (user_id, name, description) VALUES ($1, $2, $3) RETURNING id, user_id, name, description, created_at, updated_at",
-        ctx_user.id, // Use ctx_user.id
-        payload.name,
-        payload.description
+    let project = sqlx::query_as::<_, Project>(
+        "INSERT INTO projects (user_id, name, description) VALUES ($1, $2, $3) RETURNING *",
     )
+    .bind(ctx.user.id)
+    .bind(payload.name)
+    .bind(payload.description)
     .fetch_one(&db)
     .await?;
 
-    Ok(Json(json!({
-        "status": "success",
-        "data": {
-            "project": project
-        }
-    })))
+    Ok(Json(json!({ "status": "success", "data": { "project": project } })))
 }
 
-// GET /projects
-// Query params: ?page=1&limit=10
-// Lists all projects owned by the user with pagination.
-
 async fn list_projects(
-    Ctx { user: ctx_user }: Ctx, // FIXED
+    ctx: Ctx,
     State(db): State<Db>,
     Query(params): Query<ProjectListQueryParams>,
 ) -> Result<Json<Value>> {
@@ -76,27 +48,19 @@ async fn list_projects(
     let limit = params.limit.unwrap_or(10);
     let offset = (page - 1) * limit;
 
-    let projects = sqlx::query_as!(
-        Project,
-        "SELECT id, user_id, name, description, created_at, updated_at
-         FROM projects
-         WHERE user_id = $1
-         ORDER BY created_at DESC
-         LIMIT $2 OFFSET $3",
-        ctx_user.id, // Use ctx_user.id
-        limit as i64,
-        offset as i64
+    let projects: Vec<Project> = sqlx::query_as(
+        "SELECT * FROM projects WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
     )
+    .bind(ctx.user.id)
+    .bind(limit as i64)
+    .bind(offset as i64)
     .fetch_all(&db)
     .await?;
 
-    let total_projects = sqlx::query_scalar!(
-        "SELECT COUNT(id) FROM projects WHERE user_id = $1",
-        ctx_user.id // Use ctx_user.id
-    )
-    .fetch_one(&db)
-    .await?
-    .unwrap_or(0); // COUNT returns Option<i64>
+    let total_projects: i64 = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM projects WHERE user_id = $1")
+        .bind(ctx.user.id)
+        .fetch_one(&db)
+        .await?;
 
     Ok(Json(json!({
         "status": "success",
@@ -112,93 +76,59 @@ async fn list_projects(
     })))
 }
 
-// GET /projects/:id
-// Fetch a specific project details (only if user owns it).
 async fn get_project_by_id(
-    Ctx { user: ctx_user }: Ctx, // FIXED
+    ctx: Ctx,
     State(db): State<Db>,
     Path(project_id): Path<i64>,
 ) -> Result<Json<Value>> {
-    let project = sqlx::query_as!(
-        Project,
-        "SELECT id, user_id, name, description, created_at, updated_at
-         FROM projects
-         WHERE id = $1",
-        project_id
-    )
-    .fetch_optional(&db)
-    .await?
-    .ok_or(Error::ProjectNotFound)?;
+    let project = sqlx::query_as::<_, Project>("SELECT * FROM projects WHERE id = $1")
+        .bind(project_id)
+        .fetch_optional(&db)
+        .await?
+        .ok_or(Error::ProjectNotFound)?;
 
-    // Ensure the project belongs to the authenticated user
-    if project.user_id != ctx_user.id { // Use ctx_user.id
+    if project.user_id != ctx.user.id {
         return Err(Error::ProjectUnauthorized);
     }
 
-    Ok(Json(json!({
-        "status": "success",
-        "data": {
-            "project": project
-        }
-    })))
+    Ok(Json(json!({ "status": "success", "data": { "project": project } })))
 }
 
-// PUT /projects/:id
-// Update project info.
 async fn update_project(
-    Ctx { user: ctx_user }: Ctx, // FIXED
+    ctx: Ctx,
     State(db): State<Db>,
     Path(project_id): Path<i64>,
     Json(payload): Json<UpdateProjectPayload>,
 ) -> Result<Json<Value>> {
-    let updated_project = sqlx::query_as!(
-        Project,
-        "UPDATE projects
-         SET
-             name = COALESCE($1, name),
-             description = COALESCE($2, description),
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3 AND user_id = $4
-         RETURNING id, user_id, name, description, created_at, updated_at",
-        payload.name,
-        payload.description,
-        project_id,
-        ctx_user.id // Use ctx_user.id
+    let project = sqlx::query_as::<_, Project>(
+        "UPDATE projects SET name = COALESCE($1, name), description = COALESCE($2, description) WHERE id = $3 AND user_id = $4 RETURNING *",
     )
+    .bind(payload.name)
+    .bind(payload.description)
+    .bind(project_id)
+    .bind(ctx.user.id)
     .fetch_optional(&db)
     .await?
     .ok_or(Error::ProjectUnauthorized)?;
 
-    Ok(Json(json!({
-        "status": "success",
-        "data": {
-            "project": updated_project
-        }
-    })))
+    Ok(Json(json!({ "status": "success", "data": { "project": project } })))
 }
 
-// DELETE /projects/:id
-// Deletes project and cascades delete tasks.
 async fn delete_project(
-    Ctx { user: ctx_user }: Ctx, // FIXED
+    ctx: Ctx,
     State(db): State<Db>,
     Path(project_id): Path<i64>,
 ) -> Result<Json<Value>> {
-    let rows_affected = sqlx::query!(
-        "DELETE FROM projects WHERE id = $1 AND user_id = $2",
-        project_id,
-        ctx_user.id
-    )
-    .execute(&db)
-    .await?
-    .rows_affected();
+    let rows_affected = sqlx::query("DELETE FROM projects WHERE id = $1 AND user_id = $2")
+        .bind(project_id)
+        .bind(ctx.user.id)
+        .execute(&db)
+        .await?
+        .rows_affected();
 
     if rows_affected == 0 {
         return Err(Error::ProjectUnauthorized);
     }
 
-    Ok(Json(json!({
-        "status": "success",
-        "message": "Project and associated tasks deleted successfully"
-    })))
+    Ok(Json(json!({ "status": "success", "message": "Project deleted" })))
 }
