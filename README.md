@@ -124,6 +124,13 @@ All endpoints are prefixed with `/api`.
 - `POST /login`: Log in and receive a JWT token.
 - `GET /me`: Get the current user's information (requires authentication).
 
+### User Management
+
+- `GET /users`: List all users.
+- `GET /users/{id}`: Get a specific user by ID.
+- `PUT /users/{id}`: Update a user's username.
+- `DELETE /users/{id}`: Delete a user.
+
 ### Projects
 
 - `POST /projects`: Create a new project.
