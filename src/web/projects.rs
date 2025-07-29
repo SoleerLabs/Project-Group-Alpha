@@ -9,8 +9,8 @@ pub struct Project {
     pub user_id: i64,
     pub name: String,
     pub description: Option<String>,
-    pub created_at: Option<DateTime<Utc>>, // CHANGED TO OPTION
-    pub updated_at: Option<DateTime<Utc>>, // CHANGED TO OPTION
+    pub created_at: Option<DateTime<Utc>>, 
+    pub updated_at: Option<DateTime<Utc>>, 
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
