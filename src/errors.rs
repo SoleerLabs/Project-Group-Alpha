@@ -13,6 +13,7 @@ pub enum Error {
     ProjectUnauthorized,
     TaskNotFound,
     TaskUnauthorized,
+    UserNotFound,
     AnyhowError(anyhow::Error),
 }
 
@@ -31,6 +32,7 @@ impl IntoResponse for Error {
             Error::ProjectUnauthorized => (StatusCode::FORBIDDEN, "Forbidden access to project"),
             Error::TaskNotFound => (StatusCode::NOT_FOUND, "Task not found"),
             Error::TaskUnauthorized => (StatusCode::FORBIDDEN, "Forbidden access to task"),
+            Error::UserNotFound => (StatusCode::NOT_FOUND, "User not found"),
             Error::AnyhowError(err) => {
                 eprintln!("->> Anyhow Error: {err:?}");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")

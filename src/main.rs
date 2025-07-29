@@ -22,6 +22,7 @@ async fn main() {
         .route("/me", get(web::routes_auth::me))
         .merge(web::routes_projects::routes(db.clone()))
         .merge(web::routes_tasks::routes(db.clone()))
+        .merge(web::routes_user::routes(db.clone()))
         .route_layer(middleware::from_fn_with_state(
             db.clone(),
             web::mw_auth::mw_auth,
