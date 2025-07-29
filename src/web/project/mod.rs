@@ -1,8 +1,10 @@
-// src/web/project.rs
+pub mod routes;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use utoipa::ToSchema;
+
 #[derive(Debug, Serialize, FromRow, Clone, ToSchema)]
 pub struct Project {
     pub id: i64,
@@ -25,7 +27,7 @@ pub struct UpdateProjectPayload {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize)]
 pub struct ProjectListQueryParams {
     pub page: Option<u32>,
     pub limit: Option<u32>,

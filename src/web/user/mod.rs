@@ -1,3 +1,5 @@
+pub mod routes;
+
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

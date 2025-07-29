@@ -1,9 +1,6 @@
 pub mod db;
 pub mod mw_auth;
 pub mod routes_auth;
-pub mod routes_projects;
-pub mod routes_tasks;
-pub mod routes_user;
 pub mod user;
-pub mod projects;
-pub mod tasks;
+pub mod project;
+pub mod task;

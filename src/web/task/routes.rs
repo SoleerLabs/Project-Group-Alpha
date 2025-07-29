@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use crate::ctx::Ctx;
 use crate::errors::{Error, Result};
 use crate::web::db::Db;
-use crate::web::tasks::{
+use crate::web::task::{
     CreateTaskPayload, Task, TaskListQueryParams, UpdateTaskPayload,
 };
 
