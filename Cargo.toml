@@ -22,7 +22,7 @@ chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1.77"
 utoipa = { version = "4", features = ["axum_extras", "yaml"] }
 utoipa-swagger-ui = { version = "4", features = ["axum"] }
-
+serde_yaml = "0.9" 
 
 
 [dev-dependencies]
@@ -31,3 +31,5 @@ tokio = { version = "1", features = ["full"] }
 httpc-test = "0.1.1"
 dotenv = "0.15.0"
 sqlx = { version = "0.7", features = [ "runtime-tokio", "postgres", "macros", "chrono", "tls-rustls" ] }
+
+
