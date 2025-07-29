@@ -10,7 +10,7 @@ use crate::ctx::Ctx;
 use crate::errors::{Error, Result};
 use crate::web::db::Db;
 use crate::web::tasks::{
-    CreateTaskPayload, Task, TaskListQueryParams, UpdateTaskPayload,
+    CreateTaskPayload, Task, TaskListQueryParams, UpdateTaskPayload, TaskStatus,
 };
 
 pub fn routes(db: Db) -> Router {
@@ -71,7 +71,7 @@ async fn list_tasks(
     let limit = params.limit.unwrap_or(10);
     let offset = (page - 1) * limit;
 
-    let status_filter = params.status.unwrap_or_else(|| "%".to_string());
+    let status_filter = params.status;
 
     let tasks = sqlx::query_as!(
         Task,
@@ -79,7 +79,7 @@ async fn list_tasks(
         SELECT t.id, t.project_id, t.title, t.description, t.status AS "status: _", t.due_date, t.created_at, t.updated_at
         FROM tasks t
         JOIN projects p ON t.project_id = p.id
-        WHERE p.user_id = $1 AND t.status ILIKE $2
+        WHERE p.user_id = $1 AND ($2 IS NULL OR t.status = $2)
         ORDER BY t.created_at DESC
         LIMIT $3 OFFSET $4
         "#,
@@ -92,8 +92,9 @@ async fn list_tasks(
     .await?;
 
     let total_tasks = sqlx::query_scalar!(
-        "SELECT COUNT(t.id) FROM tasks t JOIN projects p ON t.project_id = p.id WHERE p.user_id = $1",
-        user_id
+        "SELECT COUNT(t.id) FROM tasks t JOIN projects p ON t.project_id = p.id WHERE p.user_id = $1 AND ($2 IS NULL OR t.status = $2)",
+        user_id,
+        status_filter
     )
     .fetch_one(&db)
     .await?
@@ -170,7 +171,7 @@ async fn update_task(
         "#,
         payload.title,
         payload.description,
-        payload.status.map(|s| s.to_string()),
+        payload.status,
         payload.due_date,
         task_id,
         user_id

@@ -1,13 +1,24 @@
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, Type};
 use chrono::{DateTime, Utc};
 use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Type, Clone, Copy)]
+#[sqlx(type_name = "task_status", rename_all = "lowercase")]
 pub enum TaskStatus {
     Pending,
     InProgress,
     Completed,
+}
+
+impl ToString for TaskStatus {
+    fn to_string(&self) -> String {
+        match self {
+            TaskStatus::Pending => "pending".to_string(),
+            TaskStatus::InProgress => "in_progress".to_string(),
+            TaskStatus::Completed => "completed".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, FromRow, Clone, ToSchema)]
@@ -16,7 +27,7 @@ pub struct Task {
     pub project_id: i64,
     pub title: String,
     pub description: Option<String>,
-    pub status: String,
+    pub status: TaskStatus,
     pub due_date: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
@@ -42,5 +53,5 @@ pub struct UpdateTaskPayload {
 pub struct TaskListQueryParams {
     pub page: Option<u32>,
     pub limit: Option<u32>,
-    pub status: Option<String>,
+    pub status: Option<TaskStatus>,
 }
