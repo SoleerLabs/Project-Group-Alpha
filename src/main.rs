@@ -16,10 +16,10 @@ async fn main() {
     dotenv::dotenv().ok();
     let db: Db = new_db_pool().await.expect("Failed to create database pool");
 
-    let public_routes = web::routes_auth::routes(db.clone());
+    let public_routes = web::auth::routes(db.clone());
 
     let protected_routes = Router::new()
-        .route("/me", get(web::routes_auth::me))
+        .route("/me", get(web::auth::me))
         .merge(web::project::routes::routes(db.clone()))
         .merge(web::task::routes::routes(db.clone()))
         .merge(web::user::routes::routes(db.clone()))
