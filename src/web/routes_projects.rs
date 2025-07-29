@@ -14,6 +14,7 @@ use super::db::Db;   // Correct path to Db
 use super::projects::{ // Correct path to project models
     CreateProjectPayload, Project, ProjectListQueryParams, UpdateProjectPayload,
 };
+const TEST_USER_ID: i64 = 1;
 pub fn routes(db: Db) -> Router {
     Router::new()
         .route("/projects", post(create_project).get(list_projects))
@@ -26,29 +27,27 @@ pub fn routes(db: Db) -> Router {
         .with_state(db)
 }
 
-// POST /projects
-// Body: { name, description }
-// Creates a project for the logged-in user.
+
 #[utoipa::path(
     post,
     path = "/projects",
-    request_body = CreateProjectPayload, // Refers to the struct defined with ToSchema
+    request_body = CreateProjectPayload, 
     responses(
-        (status = 201, description = "Project created successfully", body = Project), // Assuming Project is returned
+        (status = 201, description = "Project created successfully", body = Project), 
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
-    security(("jwt_token" = [])) // Marks this as secured by JWT
+    security(("jwt_token" = [])) 
 )]
 async fn create_project(
-    Ctx { user: ctx_user }: Ctx, // FIXED: Destructure Ctx using struct pattern
+    // Ctx { user: TEST_USER_ID }: Ctx, 
     State(db): State<Db>,
     Json(payload): Json<CreateProjectPayload>,
 ) -> Result<Json<Value>> {
     let project = sqlx::query_as!(
         Project,
         "INSERT INTO projects (user_id, name, description) VALUES ($1, $2, $3) RETURNING id, user_id, name, description, created_at, updated_at",
-        ctx_user.id, // Use ctx_user.id
+        TEST_USER_ID, // Use ctx_user.id
         payload.name,
         payload.description
     )
@@ -68,7 +67,7 @@ async fn create_project(
 // Lists all projects owned by the user with pagination.
 
 async fn list_projects(
-    Ctx { user: ctx_user }: Ctx, // FIXED
+    // Ctx { user: ctx_user }: Ctx, 
     State(db): State<Db>,
     Query(params): Query<ProjectListQueryParams>,
 ) -> Result<Json<Value>> {
@@ -83,7 +82,8 @@ async fn list_projects(
          WHERE user_id = $1
          ORDER BY created_at DESC
          LIMIT $2 OFFSET $3",
-        ctx_user.id, // Use ctx_user.id
+                TEST_USER_ID, // Use ctx_user.id
+ // Use ctx_user.id
         limit as i64,
         offset as i64
     )
@@ -92,7 +92,8 @@ async fn list_projects(
 
     let total_projects = sqlx::query_scalar!(
         "SELECT COUNT(id) FROM projects WHERE user_id = $1",
-        ctx_user.id // Use ctx_user.id
+               TEST_USER_ID, // Use ctx_user.id
+
     )
     .fetch_one(&db)
     .await?
@@ -115,7 +116,7 @@ async fn list_projects(
 // GET /projects/:id
 // Fetch a specific project details (only if user owns it).
 async fn get_project_by_id(
-    Ctx { user: ctx_user }: Ctx, // FIXED
+    // Ctx { user: ctx_user }: Ctx, // FIXED
     State(db): State<Db>,
     Path(project_id): Path<i64>,
 ) -> Result<Json<Value>> {
@@ -131,7 +132,8 @@ async fn get_project_by_id(
     .ok_or(Error::ProjectNotFound)?;
 
     // Ensure the project belongs to the authenticated user
-    if project.user_id != ctx_user.id { // Use ctx_user.id
+    if project.user_id !=         TEST_USER_ID // Use ctx_user.id
+ { // Use ctx_user.id
         return Err(Error::ProjectUnauthorized);
     }
 
@@ -146,7 +148,7 @@ async fn get_project_by_id(
 // PUT /projects/:id
 // Update project info.
 async fn update_project(
-    Ctx { user: ctx_user }: Ctx, // FIXED
+    // Ctx { user: ctx_user }: Ctx, // FIXED
     State(db): State<Db>,
     Path(project_id): Path<i64>,
     Json(payload): Json<UpdateProjectPayload>,
@@ -163,7 +165,7 @@ async fn update_project(
     .await?
     .ok_or(Error::ProjectNotFound)?;
 
-    if existing_project.user_id != ctx_user.id { // Use ctx_user.id
+    if existing_project.user_id !=  TEST_USER_ID{ // Use ctx_user.id
         return Err(Error::ProjectUnauthorized);
     }
 
@@ -179,7 +181,8 @@ async fn update_project(
         payload.name,
         payload.description,
         project_id,
-        ctx_user.id // Use ctx_user.id
+               TEST_USER_ID, // Use ctx_user.id
+ // Use ctx_user.id
     )
     .fetch_one(&db)
     .await?;
@@ -195,7 +198,7 @@ async fn update_project(
 // DELETE /projects/:id
 // Deletes project and cascades delete tasks.
 async fn delete_project(
-    Ctx { user: ctx_user }: Ctx, // FIXED
+    // Ctx { user: ctx_user }: Ctx, // FIXED
     State(db): State<Db>,
     Path(project_id): Path<i64>,
 ) -> Result<Json<Value>> {
@@ -211,13 +214,14 @@ async fn delete_project(
     .await?
     .ok_or(Error::ProjectNotFound)?;
 
-    if existing_project.user_id != ctx_user.id { // Use ctx_user.id
+    if existing_project.user_id !=  TEST_USER_ID{ // Use ctx_user.id
         return Err(Error::ProjectUnauthorized);
     }
 
     // Perform the delete. Due to ON DELETE CASCADE in the schema, tasks
     // associated with this project will also be deleted.
-    let rows_affected = sqlx::query!("DELETE FROM projects WHERE id = $1 AND user_id = $2", project_id, ctx_user.id)
+        // Use ctx_user.id
+    let rows_affected = sqlx::query!("DELETE FROM projects WHERE id = $1 AND user_id = $2", project_id, TEST_USER_ID, )
         .execute(&db)
         .await?
         .rows_affected();

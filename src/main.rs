@@ -11,13 +11,12 @@ use tower_http::services::ServeDir;
 mod ctx;
 mod errors;
 mod web;
-use web::db::{new_db_pool, Db}; // Import Db type alias
+use web::db::{new_db_pool, Db}; 
 
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
-    // Call new_db_pool, and assign its result directly to `db`
-    let db: Db = new_db_pool().await.expect("Failed to create database pool"); // FIX IS HERE!
+    let db: Db = new_db_pool().await.expect("Failed to create database pool"); 
 
     let auth_routes = web::routes_auth::routes(db.clone())
         .route_layer(middleware::from_fn_with_state(db.clone(), web::mw_auth::mw_auth));
