@@ -20,11 +20,15 @@ async fn main() {
     let db: Db = new_db_pool().await.expect("Failed to create database pool"); // FIX IS HERE!
 
     let auth_routes = web::routes_auth::routes(db.clone())
-        .route_layer(middleware::from_fn_with_state(db.clone(), web::mw_auth::mw_auth));
+        .merge(web::routes_projects::routes(db.clone()))
+        .merge(web::routes_tasks::routes(db.clone()))
+        .route_layer(middleware::from_fn_with_state(
+            db.clone(),
+            web::mw_auth::mw_auth,
+        ));
 
     let routes_all = Router::new()
         .merge(routes_hello(db.clone()))
-        .merge(web::routes_projects::routes(db.clone()))
         .nest("/api", auth_routes)
         .fallback_service(routes_static());
 
