@@ -151,22 +151,6 @@ async fn update_project(
     Path(project_id): Path<i64>,
     Json(payload): Json<UpdateProjectPayload>,
 ) -> Result<Json<Value>> {
-    // First, verify ownership
-    let existing_project = sqlx::query_as!(
-        Project,
-        "SELECT id, user_id, name, description, created_at, updated_at
-         FROM projects
-         WHERE id = $1",
-        project_id
-    )
-    .fetch_optional(&db)
-    .await?
-    .ok_or(Error::ProjectNotFound)?;
-
-    if existing_project.user_id != ctx_user.id { // Use ctx_user.id
-        return Err(Error::ProjectUnauthorized);
-    }
-
     let updated_project = sqlx::query_as!(
         Project,
         "UPDATE projects
@@ -181,8 +165,9 @@ async fn update_project(
         project_id,
         ctx_user.id // Use ctx_user.id
     )
-    .fetch_one(&db)
-    .await?;
+    .fetch_optional(&db)
+    .await?
+    .ok_or(Error::ProjectUnauthorized)?;
 
     Ok(Json(json!({
         "status": "success",
@@ -199,33 +184,17 @@ async fn delete_project(
     State(db): State<Db>,
     Path(project_id): Path<i64>,
 ) -> Result<Json<Value>> {
-    // First, verify ownership
-    let existing_project = sqlx::query_as!(
-        Project,
-        "SELECT id, user_id, name, description, created_at, updated_at
-         FROM projects
-         WHERE id = $1",
-        project_id
+    let rows_affected = sqlx::query!(
+        "DELETE FROM projects WHERE id = $1 AND user_id = $2",
+        project_id,
+        ctx_user.id
     )
-    .fetch_optional(&db)
+    .execute(&db)
     .await?
-    .ok_or(Error::ProjectNotFound)?;
-
-    if existing_project.user_id != ctx_user.id { // Use ctx_user.id
-        return Err(Error::ProjectUnauthorized);
-    }
-
-    // Perform the delete. Due to ON DELETE CASCADE in the schema, tasks
-    // associated with this project will also be deleted.
-    let rows_affected = sqlx::query!("DELETE FROM projects WHERE id = $1 AND user_id = $2", project_id, ctx_user.id)
-        .execute(&db)
-        .await?
-        .rows_affected();
+    .rows_affected();
 
     if rows_affected == 0 {
-        // This case should ideally be caught by the ownership check,
-        // but it's a good safeguard.
-        return Err(Error::ProjectNotFound);
+        return Err(Error::ProjectUnauthorized);
     }
 
     Ok(Json(json!({
