@@ -5,7 +5,7 @@ use crate::{Error, Result};
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use axum::extract::State;
-use axum::routing::{get, post};
+use axum::routing::post;
 use axum::{Json, Router};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
@@ -17,11 +17,10 @@ pub fn routes(db: Db) -> Router {
     Router::new()
         .route("/login", post(login))
         .route("/register", post(register))
-        .route("/me", get(me))
         .with_state(db)
 }
 
-async fn me(ctx: Ctx) -> Result<Json<Value>> {
+pub async fn me(ctx: Ctx) -> Result<Json<Value>> {
     Ok(Json(json!({
         "status": "success",
         "data": {
@@ -67,8 +66,8 @@ async fn register(State(db): State<Db>, Json(payload): Json<AuthPayload>) -> Res
     let user = sqlx::query_as::<_, ReturnedUser>(
         "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username",
     )
-    .bind(payload.username)
-    .bind(password_hash)
+    .bind(&payload.username)
+    .bind(&password_hash)
     .fetch_one(&db)
     .await?;
 
