@@ -18,8 +18,10 @@ sqlx = { version = "0.7", features = [ "runtime-tokio", "postgres", "macros", "c
 argon2 = { version = "0.5.3", features = ["rand"] }
 rand = "0.8.5"
 jsonwebtoken = "9.3.0"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] } 
 async-trait = "0.1.77"
+utoipa = { version = "4", features = ["axum_extras", "yaml"] }
+utoipa-swagger-ui = { version = "4", features = ["axum"] }
 
 
 
